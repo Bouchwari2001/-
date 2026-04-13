@@ -173,7 +173,7 @@ def get_page_rows(card_df, page_index):
     return rows
 
 
-def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, rows, logo_image):
+def draw_page(ax, room, school_name, update_year, rows, logo_image):
     ax.axis("off")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
@@ -232,27 +232,23 @@ def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, r
         if row > 0 and col in [0, 1, 2, 4]:
             cell.get_text().set_ha("center")
 
-    ax.text(0.11, 0.89, rtl_text(f"رقم : {inventory_number}"), ha="left", va="center", fontsize=12, fontweight="bold")
+    ax.text(0.09, 0.89, rtl_text("رقم :"), ha="left", va="center", fontsize=20, fontweight="bold")
     ax.text(0.5, 0.845, "FICHE RECAPITULATIVE DE L'INVENTAIRE", ha="center", va="center", fontsize=12.5, fontweight="bold")
     ax.text(0.5, 0.812, rtl_text("بطاقة توطين المجرود"), ha="center", va="center", fontsize=17, fontweight="bold")
 
-    ax.text(0.95, 0.755, rtl_text("الجناح :"), ha="right", va="center", fontsize=11.5, fontweight="bold")
-    draw_box(ax, 0.53, 0.738, 0.35, 0.035)
-    ax.text(0.86, 0.755, rtl_text(wing_name), ha="right", va="center", fontsize=10.5)
+    draw_box(ax, 0.035, 0.738, 0.34, 0.035)
+    ax.text(0.43, 0.755, rtl_text("المكان :"), ha="left", va="center", fontsize=11.5, fontweight="bold")
+    ax.text(0.36, 0.755, rtl_text(room), ha="right", va="center", fontsize=9.8)
 
-    ax.text(0.48, 0.755, rtl_text("المكان :"), ha="right", va="center", fontsize=11.5, fontweight="bold")
-    draw_box(ax, 0.035, 0.738, 0.37, 0.035)
-    ax.text(0.39, 0.755, rtl_text(room), ha="right", va="center", fontsize=10.5)
-
-    ax.text(0.48, 0.72, rtl_text("تاريخ التحيين :"), ha="right", va="center", fontsize=11.5, fontweight="bold")
-    draw_box(ax, 0.035, 0.702, 0.37, 0.035)
-    ax.text(0.39, 0.72, rtl_text(update_year), ha="right", va="center", fontsize=10.5)
+    draw_box(ax, 0.035, 0.700, 0.34, 0.035)
+    ax.text(0.43, 0.717, rtl_text("تاريخ التحيين :"), ha="left", va="center", fontsize=11.5, fontweight="bold")
+    ax.text(0.36, 0.717, rtl_text(update_year), ha="right", va="center", fontsize=9.8)
 
     ax.text(0.2, 0.185, rtl_text("توقيع رئيس المؤسسة"), ha="center", va="center", fontsize=11.5, fontweight="bold")
     ax.text(0.73, 0.185, rtl_text("توقيع مسير المصالح المادية و المالية"), ha="center", va="center", fontsize=11.5, fontweight="bold")
 
 
-def build_room_pdf(room, card_df, school_name, update_year, wing_name, inventory_number, logo_image):
+def build_room_pdf(room, card_df, school_name, update_year, logo_image):
     pdf_buffer = io.BytesIO()
     total_pages = max(1, math.ceil(len(card_df) / ROWS_PER_PAGE))
 
@@ -266,8 +262,6 @@ def build_room_pdf(room, card_df, school_name, update_year, wing_name, inventory
                 room=room,
                 school_name=school_name,
                 update_year=update_year,
-                wing_name=wing_name,
-                inventory_number=inventory_number,
                 rows=rows,
                 logo_image=logo_image,
             )
@@ -302,8 +296,6 @@ current_year = date.today().year
 default_update_year = f"{current_year}/{current_year + 1}"
 school_name = st.text_input("🏫 اسم المؤسسة", value="ثانوية ألمدون الإعدادية")
 update_year = st.text_input("📅 تاريخ التحيين", value=default_update_year)
-wing_name = st.text_input("🪽 الجناح", value="")
-inventory_number = st.text_input("🔢 رقم البطاقة", value="")
 logo_file = st.file_uploader("🖼️ شعار المؤسسة أو الترويسة الرسمية (اختياري)", type=["png", "jpg", "jpeg"])
 
 logo_image = None
@@ -352,8 +344,6 @@ if uploaded_file is not None:
                             card_df=card_df,
                             school_name=school_name,
                             update_year=update_year,
-                            wing_name=wing_name,
-                            inventory_number=inventory_number,
                             logo_image=logo_image,
                         )
                         zip_file.writestr(f"بطاقة_{safe_filename(room)}.pdf", pdf_bytes)
