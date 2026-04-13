@@ -178,35 +178,34 @@ def draw_page(ax, room, school_name, update_year, rows, logo_image):
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
 
-    draw_header_band(ax)
-
     if logo_image is not None:
-        ax.imshow(logo_image, extent=[0.42, 0.58, 0.875, 0.945], aspect="auto", zorder=3)
-
-    ax.text(
-        0.62,
-        0.905,
-        rtl_text("المملكة المغربية"),
-        ha="right",
-        va="top",
-        fontsize=9,
-    )
-    ax.text(
-        0.62,
-        0.885,
-        rtl_text("وزارة التربية الوطنية والتعليم الأولي والرياضة"),
-        ha="right",
-        va="top",
-        fontsize=7.8,
-    )
-    ax.text(
-        0.62,
-        0.865,
-        rtl_text(school_name),
-        ha="right",
-        va="top",
-        fontsize=7.8,
-    )
+        ax.imshow(logo_image, extent=[0.05, 0.95, 0.86, 0.96], aspect="auto", zorder=3)
+    else:
+        draw_header_band(ax)
+        ax.text(
+            0.62,
+            0.905,
+            rtl_text("المملكة المغربية"),
+            ha="right",
+            va="top",
+            fontsize=9,
+        )
+        ax.text(
+            0.62,
+            0.885,
+            rtl_text("وزارة التربية الوطنية والتعليم الأولي والرياضة"),
+            ha="right",
+            va="top",
+            fontsize=7.8,
+        )
+        ax.text(
+            0.62,
+            0.865,
+            rtl_text(school_name),
+            ha="right",
+            va="top",
+            fontsize=7.8,
+        )
 
     col_labels = [rtl_text(col) for col in TABLE_COLUMNS]
     table = ax.table(
