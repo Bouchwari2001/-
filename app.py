@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 from bidi.algorithm import get_display
-from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import font_manager
+from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib.font_manager import FontProperties
 from PIL import Image
 
@@ -41,47 +41,43 @@ st.markdown(
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 PAGE_SIZE = (8.27, 11.69)
 ROWS_PER_PAGE = 15
+ROOM_KEYWORDS = ["Salle", "قاعة", "مختبر", "Laboratoire"]
 TABLE_COLUMNS = ["ملاحظات", "رقم الجرد", "العدد", "بيان التجهيز / الأثاث", "رت"]
-TABLE_WIDTHS = [0.18, 0.16, 0.1, 0.46, 0.1]
+TABLE_WIDTHS = [0.18, 0.16, 0.10, 0.46, 0.10]
+
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
-FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.jpg"
-BODY_FONT_PATHS = [
-    str(ASSETS_DIR / "body-arabic.ttf"),
-    str(ASSETS_DIR / "Tajawal-Medium.ttf"),
-    str(ASSETS_DIR / "Amiri-Regular.ttf"),
+FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.png"
+
+BODY_FONT_CANDIDATES = [
+    ASSETS_DIR / "body-arabic.ttf",
+    ASSETS_DIR / "Tajawal-Medium.ttf",
+    ASSETS_DIR / "Amiri-Regular.ttf",
 ]
-MOROCCAN_HEADER_FONT_PATHS = [
-    str(ASSETS_DIR / "moroccan-header.ttf"),
-    r"C:\Windows\Fonts\trado.ttf",
-    r"C:\Windows\Fonts\tradbdo.ttf",
-    r"C:\Windows\Fonts\arabtype.ttf",
+HEADER_FONT_CANDIDATES = [
+    ASSETS_DIR / "moroccan-header.ttf",
+    Path(r"C:\Windows\Fonts\trado.ttf"),
+    Path(r"C:\Windows\Fonts\tradbdo.ttf"),
+    Path(r"C:\Windows\Fonts\arabtype.ttf"),
 ]
 
-BODY_FONT_PROP = None
-HEADER_FONT_PROP = None
 
-for font_path in BODY_FONT_PATHS:
-    try:
-        if Path(font_path).exists():
-            font_manager.fontManager.addfont(font_path)
-            BODY_FONT_PROP = FontProperties(fname=font_path)
-            plt.rcParams["font.family"] = BODY_FONT_PROP.get_name()
-            break
-    except Exception:
-        continue
+def load_font(candidates):
+    for candidate in candidates:
+        try:
+            if candidate.exists():
+                font_manager.fontManager.addfont(str(candidate))
+                return FontProperties(fname=str(candidate))
+        except Exception:
+            continue
+    return None
 
-for font_path in MOROCCAN_HEADER_FONT_PATHS:
-    try:
-        if Path(font_path).exists():
-            font_manager.fontManager.addfont(font_path)
-            HEADER_FONT_PROP = FontProperties(fname=font_path)
-            break
-    except Exception:
-        continue
 
-if HEADER_FONT_PROP is None:
-    HEADER_FONT_PROP = BODY_FONT_PROP
+BODY_FONT_PROP = load_font(BODY_FONT_CANDIDATES)
+HEADER_FONT_PROP = load_font(HEADER_FONT_CANDIDATES) or BODY_FONT_PROP
+
+if BODY_FONT_PROP is not None:
+    plt.rcParams["font.family"] = BODY_FONT_PROP.get_name()
 
 
 def rtl_text(value):
@@ -104,12 +100,22 @@ def text_kwargs(font_prop=None, size=None, weight=None):
     return kwargs
 
 
-def load_image_safe(path):
+def load_image_safe(source):
     try:
-        if Path(path).exists():
+        path = Path(source)
+        if path.exists():
             return Image.open(path).convert("RGBA")
+    except TypeError:
+        pass
     except Exception:
         return None
+
+    try:
+        if source is not None:
+            return Image.open(source).convert("RGBA")
+    except Exception:
+        return None
+
     return None
 
 
@@ -120,17 +126,16 @@ def safe_filename(value):
 def detect_header_row(df_raw):
     for i in range(min(20, len(df_raw))):
         row_str = " ".join(str(x) for x in df_raw.iloc[i].values)
-        if any(keyword in row_str for keyword in ["Salle", "قاعة", "مختبر", "Laboratoire"]):
+        if any(keyword in row_str for keyword in ROOM_KEYWORDS):
             return i
     return 0
 
 
 def detect_rooms(columns):
-    room_keywords = ["Salle", "قاعة", "مختبر", "Laboratoire"]
     return [
         col
         for col in columns
-        if any(keyword in str(col) for keyword in room_keywords) or str(col).strip() in ["SVT", "PC"]
+        if any(keyword in str(col) for keyword in ROOM_KEYWORDS) or str(col).strip() in {"SVT", "PC"}
     ]
 
 
@@ -182,7 +187,7 @@ def build_excel_template():
         {
             "تعليمات": [
                 "املأ اسم التجهيز في عمود: بيان التجهيز / الأثاث",
-                "ضع عدد كل تجهيز داخل العمود الخاص بالقاعة أو الجناح",
+                "ضع عدد كل تجهيز داخل العمود الخاص بالقاعة أو المختبر",
                 "يمكنك إضافة أعمدة جديدة مثل Salle 03 أو قاعة 1 أو مختبر",
                 "بعد التعبئة احفظ الملف ثم ارفعه داخل التطبيق لتوليد ملفات PDF",
             ]
@@ -235,40 +240,40 @@ def get_page_rows(card_df, page_index):
     return rows
 
 
-def draw_page(ax, room, school_name, update_year, rows, header_mode, header_image, school_name_header, directorate_name, academy_name):
-    ax.axis("off")
-    ax.set_xlim(0, 1)
-    ax.set_ylim(0, 1)
+def draw_default_header(ax, academy_name, directorate_name, school_name):
+    draw_header_band(ax)
+    ax.text(
+        0.78,
+        0.93,
+        rtl_text(academy_name or "الأكاديمية الجهوية"),
+        ha="right",
+        va="top",
+        **text_kwargs(HEADER_FONT_PROP, size=10.5, weight="bold"),
+    )
+    ax.text(
+        0.78,
+        0.904,
+        rtl_text(directorate_name or "المديرية الإقليمية"),
+        ha="right",
+        va="top",
+        **text_kwargs(HEADER_FONT_PROP, size=8.8),
+    )
+    ax.text(
+        0.78,
+        0.878,
+        rtl_text(school_name or "اسم المؤسسة"),
+        ha="right",
+        va="top",
+        **text_kwargs(HEADER_FONT_PROP, size=8.8),
+    )
 
+
+def draw_header(ax, header_mode, header_image, academy_name, directorate_name, school_name):
     if header_image is not None:
-        header_extent = [0.05, 0.95, 0.84, 0.965] if header_mode == "fixed" else [0.05, 0.95, 0.845, 0.965]
-        ax.imshow(header_image, extent=header_extent, aspect="auto", zorder=2)
+        extent = [0.05, 0.95, 0.84, 0.965] if header_mode == "fixed" else [0.05, 0.95, 0.845, 0.965]
+        ax.imshow(header_image, extent=extent, aspect="auto", zorder=2)
     else:
-        draw_header_band(ax)
-        ax.text(
-            0.78,
-            0.93,
-            rtl_text("المملكة المغربية"),
-            ha="right",
-            va="top",
-            **text_kwargs(BODY_FONT_PROP, size=10.5, weight="bold"),
-        )
-        ax.text(
-            0.78,
-            0.904,
-            rtl_text(directorate_name or "وزارة التربية الوطنية والتعليم الأولي والرياضة"),
-            ha="right",
-            va="top",
-            **text_kwargs(BODY_FONT_PROP, size=8.7),
-        )
-        ax.text(
-            0.78,
-            0.878,
-            rtl_text(school_name_header or school_name),
-            ha="right",
-            va="top",
-            **text_kwargs(BODY_FONT_PROP, size=8.7),
-        )
+        draw_default_header(ax, academy_name, directorate_name, school_name)
 
     info_y_start = 0.83 if header_image is not None else 0.835
     ax.text(
@@ -290,12 +295,14 @@ def draw_page(ax, room, school_name, update_year, rows, header_mode, header_imag
     ax.text(
         0.5,
         info_y_start - 0.054,
-        rtl_text(school_name_header or school_name),
+        rtl_text(school_name),
         ha="center",
         va="top",
         **text_kwargs(HEADER_FONT_PROP, size=9.4),
     )
 
+
+def draw_table(ax, rows):
     col_labels = [rtl_text(col) for col in TABLE_COLUMNS]
     table = ax.table(
         cellText=rows,
@@ -315,12 +322,23 @@ def draw_page(ax, room, school_name, update_year, rows, header_mode, header_imag
             cell.set_height(0.026)
         else:
             cell.set_height(0.025)
+
         if BODY_FONT_PROP is not None:
             cell.get_text().set_fontproperties(BODY_FONT_PROP)
+
         if col == 3:
             cell.get_text().set_ha("right")
-        if row > 0 and col in [0, 1, 2, 4]:
+        elif row > 0 and col in [0, 1, 2, 4]:
             cell.get_text().set_ha("center")
+
+
+def draw_page(ax, room, update_year, rows, header_mode, header_image, school_name, directorate_name, academy_name):
+    ax.axis("off")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+
+    draw_header(ax, header_mode, header_image, academy_name, directorate_name, school_name)
+    draw_table(ax, rows)
 
     ax.text(0.5, 0.735, "FICHE RECAPITULATIVE DE L'INVENTAIRE", ha="center", va="center", fontsize=12.5, fontweight="bold")
     ax.text(0.5, 0.695, rtl_text("بطاقة توطين المجرود"), ha="center", va="center", **text_kwargs(BODY_FONT_PROP, size=16, weight="bold"))
@@ -337,7 +355,7 @@ def draw_page(ax, room, school_name, update_year, rows, header_mode, header_imag
     ax.text(0.72, 0.135, rtl_text("توقيع مسير المصالح المادية والمالية"), ha="center", va="center", **text_kwargs(BODY_FONT_PROP, size=10))
 
 
-def build_room_pdf(room, card_df, school_name, update_year, header_mode, header_image, school_name_header, directorate_name, academy_name):
+def build_room_pdf(room, card_df, update_year, header_mode, header_image, school_name, directorate_name, academy_name):
     pdf_buffer = io.BytesIO()
     total_pages = max(1, math.ceil(len(card_df) / ROWS_PER_PAGE))
 
@@ -345,24 +363,95 @@ def build_room_pdf(room, card_df, school_name, update_year, header_mode, header_
         for page_index in range(total_pages):
             fig, ax = plt.subplots(figsize=PAGE_SIZE)
             fig.patch.set_facecolor("white")
-            rows = get_page_rows(card_df, page_index)
+
             draw_page(
                 ax=ax,
                 room=room,
-                school_name=school_name,
                 update_year=update_year,
-                rows=rows,
+                rows=get_page_rows(card_df, page_index),
                 header_mode=header_mode,
                 header_image=header_image,
-                school_name_header=school_name_header,
+                school_name=school_name,
                 directorate_name=directorate_name,
                 academy_name=academy_name,
             )
+
             pdf.savefig(fig, bbox_inches="tight", pad_inches=0.2)
             plt.close(fig)
 
     pdf_buffer.seek(0)
     return pdf_buffer.getvalue()
+
+
+def read_inventory_file(uploaded_file):
+    df_raw = pd.read_excel(uploaded_file, header=None)
+    header_idx = detect_header_row(df_raw)
+
+    uploaded_file.seek(0)
+    df = pd.read_excel(uploaded_file, header=header_idx)
+    df.columns = [str(c).replace("\n", " ").strip() for c in df.columns]
+    return df
+
+
+def render_header_controls():
+    academy_name = st.text_input("🌍 الأكاديمية / الجهة", value="الأكاديمية الجهوية")
+    directorate_name = st.text_input("🏢 المديرية", value="المديرية الإقليمية")
+    school_name = st.text_input("🏫 اسم المؤسسة", value="ثانوية ألمدون الإعدادية")
+    return academy_name, directorate_name, school_name
+
+
+def render_header_mode():
+    header_mode_label = st.radio(
+        "🖼️ وضع الترويسة",
+        options=["استعمال الترويسة الثابتة مع إضافة المعلومات", "رفع ترويسة خاصة"],
+        index=0,
+    )
+
+    header_mode = "fixed" if header_mode_label == "استعمال الترويسة الثابتة مع إضافة المعلومات" else "custom"
+
+    if header_mode == "fixed":
+        header_image = load_image_safe(FIXED_HEADER_IMAGE_PATH)
+        if header_image is not None:
+            st.image(header_image, caption="الترويسة الثابتة المستعملة", use_container_width=True)
+        else:
+            st.warning("ملف الترويسة الثابتة غير موجود في assets/fixed_header.png. يمكنك إضافته أو اختيار رفع ترويسة خاصة.")
+        return header_mode, header_image
+
+    uploaded_header = st.file_uploader("🖼️ ارفع ترويسة خاصة", type=["png", "jpg", "jpeg"])
+    header_image = load_image_safe(uploaded_header)
+    if uploaded_header is not None and header_image is None:
+        st.warning("تعذر قراءة ملف الترويسة. حاول رفع صورة بصيغة PNG أو JPG.")
+    elif header_image is not None:
+        st.image(header_image, caption="معاينة الترويسة الخاصة", use_container_width=True)
+
+    return header_mode, header_image
+
+
+def generate_all_pdfs(df, rooms, equipment_col, update_year, header_mode, header_image, school_name, directorate_name, academy_name):
+    zip_buffer = io.BytesIO()
+    generated = 0
+
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for room in rooms:
+            card_df = prepare_card_dataframe(df, room, equipment_col)
+            if card_df.empty:
+                continue
+
+            pdf_bytes = build_room_pdf(
+                room=room,
+                card_df=card_df,
+                update_year=update_year,
+                header_mode=header_mode,
+                header_image=header_image,
+                school_name=school_name,
+                directorate_name=directorate_name,
+                academy_name=academy_name,
+            )
+            zip_file.writestr(f"بطاقة_{safe_filename(room)}.pdf", pdf_bytes)
+            generated += 1
+
+    zip_buffer.seek(0)
+    return generated, zip_buffer.getvalue()
 
 
 st.title("🏫 تطبيق توليد بطاقات الجرد PDF")
@@ -384,45 +473,16 @@ if workflow == "تحميل قالب Excel ثم تعبئته":
     )
 
 uploaded_file = st.file_uploader("📥 ارفع ملف الجرد (Excel: xlsx أو xls)", type=["xlsx", "xls"])
-
 current_year = date.today().year
 default_update_year = f"{current_year}/{current_year + 1}"
-school_name = st.text_input("🏫 اسم المؤسسة", value="ثانوية ألمدون الإعدادية")
-directorate_name = st.text_input("🏢 المديرية", value="المديرية الإقليمية")
-academy_name = st.text_input("🌍 الأكاديمية / الجهة", value="الأكاديمية الجهوية")
+
+academy_name, directorate_name, school_name = render_header_controls()
 update_year = st.text_input("📅 تاريخ التحيين", value=default_update_year)
-header_mode_label = st.radio(
-    "🖼️ وضع الترويسة",
-    options=["استعمال الترويسة الثابتة مع إضافة المعلومات", "رفع ترويسة خاصة"],
-    index=0,
-)
-
-header_mode = "fixed" if header_mode_label == "استعمال الترويسة الثابتة مع إضافة المعلومات" else "custom"
-header_image = load_image_safe(FIXED_HEADER_IMAGE_PATH) if header_mode == "fixed" else None
-
-if header_mode == "custom":
-    logo_file = st.file_uploader("🖼️ ارفع ترويسة خاصة", type=["png", "jpg", "jpeg"])
-    if logo_file is not None:
-        try:
-            header_image = Image.open(logo_file).convert("RGBA")
-            st.image(header_image, caption="معاينة الترويسة الخاصة", use_container_width=True)
-        except Exception:
-            st.warning("تعذر قراءة ملف الترويسة. حاول رفع صورة بصيغة PNG أو JPG.")
-else:
-    if header_image is not None:
-        st.image(header_image, caption="الترويسة الثابتة المستعملة", use_container_width=True)
-    else:
-        st.warning("ملف الترويسة الثابتة غير موجود في assets/fixed_header.png. يمكنك إضافته أو اختيار رفع ترويسة خاصة.")
+header_mode, header_image = render_header_mode()
 
 if uploaded_file is not None:
     try:
-        df_raw = pd.read_excel(uploaded_file, header=None)
-        header_idx = detect_header_row(df_raw)
-
-        uploaded_file.seek(0)
-        df = pd.read_excel(uploaded_file, header=header_idx)
-        df.columns = [str(c).replace("\n", " ").strip() for c in df.columns]
-
+        df = read_inventory_file(uploaded_file)
         rooms = detect_rooms(df.columns)
         equipment_default = detect_equipment_column(df.columns.tolist())
 
@@ -438,35 +498,23 @@ if uploaded_file is not None:
             )
 
             if st.button("⚙️ توليد بطاقات PDF"):
-                zip_buffer = io.BytesIO()
-                generated = 0
-
-                with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-                    for room in rooms:
-                        card_df = prepare_card_dataframe(df, room, equipment_col)
-                        if card_df.empty:
-                            continue
-
-                        pdf_bytes = build_room_pdf(
-                            room=room,
-                            card_df=card_df,
-                            school_name=school_name,
-                            update_year=update_year,
-                            header_mode=header_mode,
-                            header_image=header_image,
-                            school_name_header=school_name,
-                            directorate_name=directorate_name,
-                            academy_name=academy_name,
-                        )
-                        zip_file.writestr(f"بطاقة_{safe_filename(room)}.pdf", pdf_bytes)
-                        generated += 1
+                generated, zip_bytes = generate_all_pdfs(
+                    df=df,
+                    rooms=rooms,
+                    equipment_col=equipment_col,
+                    update_year=update_year,
+                    header_mode=header_mode,
+                    header_image=header_image,
+                    school_name=school_name,
+                    directorate_name=directorate_name,
+                    academy_name=academy_name,
+                )
 
                 if generated:
-                    zip_buffer.seek(0)
                     st.success(f"🎉 تم إنشاء {generated} ملف PDF بنجاح.")
                     st.download_button(
                         label="📦 تحميل جميع البطاقات PDF",
-                        data=zip_buffer.getvalue(),
+                        data=zip_bytes,
                         file_name="inventory_cards_pdf.zip",
                         mime="application/zip",
                     )
