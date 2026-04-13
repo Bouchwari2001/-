@@ -45,7 +45,7 @@ TABLE_COLUMNS = ["ملاحظات", "رقم الجرد", "العدد", "بيان 
 TABLE_WIDTHS = [0.18, 0.16, 0.1, 0.46, 0.1]
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
-FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.png"
+FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.jpg"
 BODY_FONT_PATHS = [
     str(ASSETS_DIR / "body-arabic.ttf"),
     str(ASSETS_DIR / "Tajawal-Medium.ttf"),
