@@ -46,7 +46,7 @@ TABLE_WIDTHS = [0.18, 0.16, 0.1, 0.46, 0.1]
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
 TAJAWAL_FONT_PATH = str(ASSETS_DIR / "Tajawal-Medium.ttf")
-FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.png"
+FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.jpg"
 MOROCCAN_HEADER_FONT_PATHS = [
     str(ASSETS_DIR / "moroccan-header.ttf"),
     r"C:\Windows\Fonts\trado.ttf",
