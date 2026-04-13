@@ -36,7 +36,7 @@ st.markdown(
 
 ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 PAGE_SIZE = (8.27, 11.69)
-ROWS_PER_PAGE = 18
+ROWS_PER_PAGE = 15
 TABLE_COLUMNS = ["ملاحظات", "رقم الجرد", "العدد", "بيان التجهيز / الأثاث", "رت"]
 TABLE_WIDTHS = [0.18, 0.16, 0.1, 0.46, 0.1]
 
@@ -104,120 +104,139 @@ def prepare_card_dataframe(df, room, equipment_col):
     return pd.DataFrame(rows, columns=TABLE_COLUMNS)
 
 
-def draw_page(ax, room, school_name, update_year, page_df, page_num, total_pages, show_signatures):
+def draw_box(ax, x, y, w, h, lw=1.2):
+    rect = plt.Rectangle((x, y), w, h, fill=False, linewidth=lw, edgecolor="black")
+    ax.add_patch(rect)
+
+
+def draw_header_band(ax):
+    color = "#244b7a"
+    ax.plot([0.05, 0.26], [0.94, 0.94], color=color, lw=2.2)
+    ax.plot([0.74, 0.95], [0.94, 0.94], color=color, lw=2.2)
+    ax.plot([0.26, 0.28], [0.94, 0.946], color=color, lw=2.2)
+    ax.plot([0.28, 0.72], [0.946, 0.946], color=color, lw=2.2)
+    ax.plot([0.72, 0.74], [0.946, 0.94], color=color, lw=2.2)
+
+
+def get_page_rows(card_df, page_index):
+    start = page_index * ROWS_PER_PAGE
+    end = start + ROWS_PER_PAGE
+    page_df = card_df.iloc[start:end].copy()
+
+    rows = []
+    for offset in range(ROWS_PER_PAGE):
+        rank = start + offset + 1
+        if offset < len(page_df):
+            row = page_df.iloc[offset]
+            rows.append(
+                [
+                    rtl_text(row["ملاحظات"]),
+                    rtl_text(row["رقم الجرد"]),
+                    str(row["العدد"]),
+                    rtl_text(row["بيان التجهيز / الأثاث"]),
+                    str(rank),
+                ]
+            )
+        else:
+            rows.append(["", "", "", "", str(rank)])
+    return rows
+
+
+def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, rows):
     ax.axis("off")
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+
+    draw_header_band(ax)
 
     ax.text(
-        0.96,
-        0.965,
+        0.61,
+        0.922,
         rtl_text("المملكة المغربية"),
         ha="right",
         va="top",
-        fontsize=13,
-        fontweight="bold",
+        fontsize=7,
     )
     ax.text(
-        0.96,
-        0.935,
+        0.61,
+        0.91,
         rtl_text("وزارة التربية الوطنية والتعليم الأولي والرياضة"),
         ha="right",
         va="top",
-        fontsize=11,
+        fontsize=6.3,
     )
     ax.text(
-        0.96,
-        0.905,
+        0.61,
+        0.898,
         rtl_text(school_name),
         ha="right",
         va="top",
-        fontsize=11,
+        fontsize=6.3,
     )
-
-    ax.text(0.5, 0.87, "FICHE RECAPITULATIVE DE L'INVENTAIRE", ha="center", va="center", fontsize=13, fontweight="bold")
-    ax.text(0.5, 0.842, rtl_text("بطاقة توطين المجرود"), ha="center", va="center", fontsize=14, fontweight="bold")
-
-    ax.text(0.96, 0.807, rtl_text(f"المكان : {room}"), ha="right", va="center", fontsize=11, fontweight="bold")
-    ax.text(0.04, 0.807, rtl_text(f"تاريخ التحيين : {update_year}"), ha="left", va="center", fontsize=11)
-
-    table_data = []
-    for _, row in page_df.iterrows():
-        table_data.append(
-            [
-                rtl_text(row["ملاحظات"]),
-                rtl_text(row["رقم الجرد"]),
-                str(row["العدد"]),
-                rtl_text(row["بيان التجهيز / الأثاث"]),
-                str(row["رت"]),
-            ]
-        )
 
     col_labels = [rtl_text(col) for col in TABLE_COLUMNS]
     table = ax.table(
-        cellText=table_data,
+        cellText=rows,
         colLabels=col_labels,
         colWidths=TABLE_WIDTHS,
         cellLoc="center",
-        bbox=[0.04, 0.19, 0.92, 0.57],
+        bbox=[0.035, 0.195, 0.91, 0.51],
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(10)
+    table.set_fontsize(10.5)
 
     for (row, col), cell in table.get_celld().items():
-        cell.set_linewidth(0.8)
+        cell.set_linewidth(1.2)
         if row == 0:
-            cell.set_facecolor("#D9D9D9")
+            cell.set_facecolor("#d3d3d3")
             cell.set_text_props(weight="bold")
-            cell.set_height(0.04)
+            cell.set_height(0.034)
         else:
-            cell.set_height(0.029)
+            cell.set_height(0.037)
         if col == 3:
             cell.get_text().set_ha("right")
+        if row > 0 and col in [0, 1, 2, 4]:
+            cell.get_text().set_ha("center")
 
-    ax.text(
-        0.5,
-        0.15,
-        rtl_text(f"الصفحة {page_num} من {total_pages}"),
-        ha="center",
-        va="center",
-        fontsize=10,
-    )
+    ax.text(0.11, 0.89, rtl_text(f"رقم : {inventory_number}"), ha="left", va="center", fontsize=12, fontweight="bold")
+    ax.text(0.5, 0.845, "FICHE RECAPITULATIVE DE L'INVENTAIRE", ha="center", va="center", fontsize=12.5, fontweight="bold")
+    ax.text(0.5, 0.812, rtl_text("بطاقة توطين المجرود"), ha="center", va="center", fontsize=17, fontweight="bold")
 
-    if show_signatures:
-        ax.text(0.2, 0.08, rtl_text("توقيع رئيس المؤسسة"), ha="center", va="center", fontsize=11, fontweight="bold")
-        ax.text(
-            0.8,
-            0.08,
-            rtl_text("توقيع مسير المصالح المادية والمالية"),
-            ha="center",
-            va="center",
-            fontsize=11,
-            fontweight="bold",
-        )
+    ax.text(0.95, 0.755, rtl_text("الجناح :"), ha="right", va="center", fontsize=11.5, fontweight="bold")
+    draw_box(ax, 0.53, 0.738, 0.35, 0.035)
+    ax.text(0.86, 0.755, rtl_text(wing_name), ha="right", va="center", fontsize=10.5)
+
+    ax.text(0.48, 0.755, rtl_text("المكان :"), ha="right", va="center", fontsize=11.5, fontweight="bold")
+    draw_box(ax, 0.035, 0.738, 0.37, 0.035)
+    ax.text(0.39, 0.755, rtl_text(room), ha="right", va="center", fontsize=10.5)
+
+    ax.text(0.48, 0.72, rtl_text("تاريخ التحيين :"), ha="right", va="center", fontsize=11.5, fontweight="bold")
+    draw_box(ax, 0.035, 0.702, 0.37, 0.035)
+    ax.text(0.39, 0.72, rtl_text(update_year), ha="right", va="center", fontsize=10.5)
+
+    ax.text(0.2, 0.185, rtl_text("توقيع رئيس المؤسسة"), ha="center", va="center", fontsize=11.5, fontweight="bold")
+    ax.text(0.73, 0.185, rtl_text("توقيع مسير المصالح المادية و المالية"), ha="center", va="center", fontsize=11.5, fontweight="bold")
 
 
-def build_room_pdf(room, card_df, school_name, update_year):
+def build_room_pdf(room, card_df, school_name, update_year, wing_name, inventory_number):
     pdf_buffer = io.BytesIO()
     total_pages = max(1, math.ceil(len(card_df) / ROWS_PER_PAGE))
 
     with PdfPages(pdf_buffer) as pdf:
         for page_index in range(total_pages):
-            start = page_index * ROWS_PER_PAGE
-            end = start + ROWS_PER_PAGE
-            page_df = card_df.iloc[start:end].copy()
-
             fig, ax = plt.subplots(figsize=PAGE_SIZE)
             fig.patch.set_facecolor("white")
+            rows = get_page_rows(card_df, page_index)
             draw_page(
                 ax=ax,
                 room=room,
                 school_name=school_name,
                 update_year=update_year,
-                page_df=page_df,
-                page_num=page_index + 1,
-                total_pages=total_pages,
-                show_signatures=page_index == total_pages - 1,
+                wing_name=wing_name,
+                inventory_number=inventory_number,
+                rows=rows,
             )
-            pdf.savefig(fig, bbox_inches="tight")
+            pdf.savefig(fig, bbox_inches="tight", pad_inches=0.2)
             plt.close(fig)
 
     pdf_buffer.seek(0)
@@ -233,6 +252,8 @@ current_year = date.today().year
 default_update_year = f"{current_year}/{current_year + 1}"
 school_name = st.text_input("🏫 اسم المؤسسة", value="ثانوية ألمدون الإعدادية")
 update_year = st.text_input("📅 تاريخ التحيين", value=default_update_year)
+wing_name = st.text_input("🪽 الجناح", value="")
+inventory_number = st.text_input("🔢 رقم البطاقة", value="")
 
 if uploaded_file is not None:
     try:
@@ -272,6 +293,8 @@ if uploaded_file is not None:
                             card_df=card_df,
                             school_name=school_name,
                             update_year=update_year,
+                            wing_name=wing_name,
+                            inventory_number=inventory_number,
                         )
                         zip_file.writestr(f"بطاقة_{safe_filename(room)}.pdf", pdf_bytes)
                         generated += 1
