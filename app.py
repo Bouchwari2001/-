@@ -181,31 +181,31 @@ def draw_page(ax, room, school_name, update_year, rows, logo_image):
     draw_header_band(ax)
 
     if logo_image is not None:
-        ax.imshow(logo_image, extent=[0.42, 0.58, 0.895, 0.945], aspect="auto", zorder=3)
+        ax.imshow(logo_image, extent=[0.42, 0.58, 0.875, 0.945], aspect="auto", zorder=3)
 
     ax.text(
-        0.61,
-        0.922,
+        0.62,
+        0.905,
         rtl_text("المملكة المغربية"),
         ha="right",
         va="top",
-        fontsize=6.8,
+        fontsize=9,
     )
     ax.text(
-        0.61,
-        0.91,
+        0.62,
+        0.885,
         rtl_text("وزارة التربية الوطنية والتعليم الأولي والرياضة"),
         ha="right",
         va="top",
-        fontsize=6.1,
+        fontsize=7.8,
     )
     ax.text(
-        0.61,
-        0.898,
+        0.62,
+        0.865,
         rtl_text(school_name),
         ha="right",
         va="top",
-        fontsize=6.1,
+        fontsize=7.8,
     )
 
     col_labels = [rtl_text(col) for col in TABLE_COLUMNS]
@@ -232,7 +232,6 @@ def draw_page(ax, room, school_name, update_year, rows, logo_image):
         if row > 0 and col in [0, 1, 2, 4]:
             cell.get_text().set_ha("center")
 
-    ax.text(0.09, 0.89, rtl_text("رقم :"), ha="left", va="center", fontsize=20, fontweight="bold")
     ax.text(0.5, 0.845, "FICHE RECAPITULATIVE DE L'INVENTAIRE", ha="center", va="center", fontsize=12.5, fontweight="bold")
     ax.text(0.5, 0.812, rtl_text("بطاقة توطين المجرود"), ha="center", va="center", fontsize=17, fontweight="bold")
 
