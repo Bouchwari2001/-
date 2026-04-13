@@ -45,8 +45,12 @@ TABLE_COLUMNS = ["ملاحظات", "رقم الجرد", "العدد", "بيان 
 TABLE_WIDTHS = [0.18, 0.16, 0.1, 0.46, 0.1]
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
-TAJAWAL_FONT_PATH = str(ASSETS_DIR / "Tajawal-Medium.ttf")
-FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.jpg"
+FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.png"
+BODY_FONT_PATHS = [
+    str(ASSETS_DIR / "body-arabic.ttf"),
+    str(ASSETS_DIR / "Tajawal-Medium.ttf"),
+    str(ASSETS_DIR / "Amiri-Regular.ttf"),
+]
 MOROCCAN_HEADER_FONT_PATHS = [
     str(ASSETS_DIR / "moroccan-header.ttf"),
     r"C:\Windows\Fonts\trado.ttf",
@@ -55,13 +59,29 @@ MOROCCAN_HEADER_FONT_PATHS = [
 ]
 
 BODY_FONT_PROP = None
+HEADER_FONT_PROP = None
 
-try:
-    font_manager.fontManager.addfont(TAJAWAL_FONT_PATH)
-    BODY_FONT_PROP = FontProperties(fname=TAJAWAL_FONT_PATH)
-    plt.rcParams["font.family"] = BODY_FONT_PROP.get_name()
-except Exception:
-    BODY_FONT_PROP = None
+for font_path in BODY_FONT_PATHS:
+    try:
+        if Path(font_path).exists():
+            font_manager.fontManager.addfont(font_path)
+            BODY_FONT_PROP = FontProperties(fname=font_path)
+            plt.rcParams["font.family"] = BODY_FONT_PROP.get_name()
+            break
+    except Exception:
+        continue
+
+for font_path in MOROCCAN_HEADER_FONT_PATHS:
+    try:
+        if Path(font_path).exists():
+            font_manager.fontManager.addfont(font_path)
+            HEADER_FONT_PROP = FontProperties(fname=font_path)
+            break
+    except Exception:
+        continue
+
+if HEADER_FONT_PROP is None:
+    HEADER_FONT_PROP = BODY_FONT_PROP
 
 
 def rtl_text(value):
@@ -254,10 +274,10 @@ def draw_page(ax, room, school_name, update_year, rows, header_mode, header_imag
     ax.text(
         0.5,
         info_y_start,
-        rtl_text(school_name_header or school_name),
+        rtl_text(academy_name),
         ha="center",
         va="top",
-        **text_kwargs(BODY_FONT_PROP, size=11, weight="bold"),
+        **text_kwargs(HEADER_FONT_PROP, size=11.5, weight="bold"),
     )
     ax.text(
         0.5,
@@ -265,15 +285,15 @@ def draw_page(ax, room, school_name, update_year, rows, header_mode, header_imag
         rtl_text(directorate_name),
         ha="center",
         va="top",
-        **text_kwargs(BODY_FONT_PROP, size=9.2),
+        **text_kwargs(HEADER_FONT_PROP, size=9.4),
     )
     ax.text(
         0.5,
         info_y_start - 0.054,
-        rtl_text(academy_name),
+        rtl_text(school_name_header or school_name),
         ha="center",
         va="top",
-        **text_kwargs(BODY_FONT_PROP, size=9.2),
+        **text_kwargs(HEADER_FONT_PROP, size=9.4),
     )
 
     col_labels = [rtl_text(col) for col in TABLE_COLUMNS]
