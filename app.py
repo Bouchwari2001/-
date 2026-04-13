@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 from bidi.algorithm import get_display
 from matplotlib.backends.backend_pdf import PdfPages
+from PIL import Image
 
 
 st.set_page_config(page_title="نظام بطاقات الجرد", page_icon="🏫", layout="centered")
@@ -104,6 +105,36 @@ def prepare_card_dataframe(df, room, equipment_col):
     return pd.DataFrame(rows, columns=TABLE_COLUMNS)
 
 
+def build_excel_template():
+    buffer = io.BytesIO()
+
+    sample_rows = [
+        {"بيان التجهيز / الأثاث": "طاولة", "Salle 01": 10, "Salle 02": 0, "مختبر": 0, "SVT": 0, "PC": 0},
+        {"بيان التجهيز / الأثاث": "كرسي", "Salle 01": 20, "Salle 02": 18, "مختبر": 0, "SVT": 0, "PC": 0},
+        {"بيان التجهيز / الأثاث": "سبورة", "Salle 01": 1, "Salle 02": 1, "مختبر": 0, "SVT": 0, "PC": 0},
+        {"بيان التجهيز / الأثاث": "حاسوب", "Salle 01": 0, "Salle 02": 0, "مختبر": 0, "SVT": 0, "PC": 12},
+    ]
+    template_df = pd.DataFrame(sample_rows)
+
+    instructions_df = pd.DataFrame(
+        {
+            "تعليمات": [
+                "املأ اسم التجهيز في عمود: بيان التجهيز / الأثاث",
+                "ضع عدد كل تجهيز داخل العمود الخاص بالقاعة أو الجناح",
+                "يمكنك إضافة أعمدة جديدة مثل Salle 03 أو قاعة 1 أو مختبر",
+                "بعد التعبئة احفظ الملف ثم ارفعه داخل التطبيق لتوليد ملفات PDF",
+            ]
+        }
+    )
+
+    with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
+        template_df.to_excel(writer, sheet_name="الجرد", index=False)
+        instructions_df.to_excel(writer, sheet_name="تعليمات", index=False)
+
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
 def draw_box(ax, x, y, w, h, lw=1.2):
     rect = plt.Rectangle((x, y), w, h, fill=False, linewidth=lw, edgecolor="black")
     ax.add_patch(rect)
@@ -142,12 +173,15 @@ def get_page_rows(card_df, page_index):
     return rows
 
 
-def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, rows):
+def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, rows, logo_image):
     ax.axis("off")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
 
     draw_header_band(ax)
+
+    if logo_image is not None:
+        ax.imshow(logo_image, extent=[0.42, 0.58, 0.895, 0.945], aspect="auto", zorder=3)
 
     ax.text(
         0.61,
@@ -155,7 +189,7 @@ def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, r
         rtl_text("المملكة المغربية"),
         ha="right",
         va="top",
-        fontsize=7,
+        fontsize=6.8,
     )
     ax.text(
         0.61,
@@ -163,7 +197,7 @@ def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, r
         rtl_text("وزارة التربية الوطنية والتعليم الأولي والرياضة"),
         ha="right",
         va="top",
-        fontsize=6.3,
+        fontsize=6.1,
     )
     ax.text(
         0.61,
@@ -171,7 +205,7 @@ def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, r
         rtl_text(school_name),
         ha="right",
         va="top",
-        fontsize=6.3,
+        fontsize=6.1,
     )
 
     col_labels = [rtl_text(col) for col in TABLE_COLUMNS]
@@ -218,7 +252,7 @@ def draw_page(ax, room, school_name, update_year, wing_name, inventory_number, r
     ax.text(0.73, 0.185, rtl_text("توقيع مسير المصالح المادية و المالية"), ha="center", va="center", fontsize=11.5, fontweight="bold")
 
 
-def build_room_pdf(room, card_df, school_name, update_year, wing_name, inventory_number):
+def build_room_pdf(room, card_df, school_name, update_year, wing_name, inventory_number, logo_image):
     pdf_buffer = io.BytesIO()
     total_pages = max(1, math.ceil(len(card_df) / ROWS_PER_PAGE))
 
@@ -235,6 +269,7 @@ def build_room_pdf(room, card_df, school_name, update_year, wing_name, inventory
                 wing_name=wing_name,
                 inventory_number=inventory_number,
                 rows=rows,
+                logo_image=logo_image,
             )
             pdf.savefig(fig, bbox_inches="tight", pad_inches=0.2)
             plt.close(fig)
@@ -246,6 +281,21 @@ def build_room_pdf(room, card_df, school_name, update_year, wing_name, inventory
 st.title("🏫 تطبيق توليد بطاقات الجرد PDF")
 st.markdown("ارفع ملف الجرد بصيغة Excel وسيتم توليد بطاقات PDF جاهزة للطباعة مع دعم العربية واتجاه RTL.")
 
+workflow = st.radio(
+    "🧭 اختر طريقة العمل",
+    options=["رفع ملف جرد جاهز", "تحميل قالب Excel ثم تعبئته"],
+    horizontal=True,
+)
+
+if workflow == "تحميل قالب Excel ثم تعبئته":
+    st.info("يمكنك تحميل القالب، تعبئته ببيانات الجرد، ثم إعادة رفعه هنا لتوليد ملفات PDF.")
+    st.download_button(
+        label="📄 تحميل قالب Excel",
+        data=build_excel_template(),
+        file_name="inventory_template.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+
 uploaded_file = st.file_uploader("📥 ارفع ملف الجرد (Excel: xlsx أو xls)", type=["xlsx", "xls"])
 
 current_year = date.today().year
@@ -254,6 +304,15 @@ school_name = st.text_input("🏫 اسم المؤسسة", value="ثانوية أ
 update_year = st.text_input("📅 تاريخ التحيين", value=default_update_year)
 wing_name = st.text_input("🪽 الجناح", value="")
 inventory_number = st.text_input("🔢 رقم البطاقة", value="")
+logo_file = st.file_uploader("🖼️ شعار المؤسسة أو الترويسة الرسمية (اختياري)", type=["png", "jpg", "jpeg"])
+
+logo_image = None
+if logo_file is not None:
+    try:
+        logo_image = Image.open(logo_file).convert("RGBA")
+        st.image(logo_image, caption="معاينة الشعار أو الترويسة", use_container_width=True)
+    except Exception:
+        st.warning("تعذر قراءة ملف الشعار. حاول رفع صورة بصيغة PNG أو JPG.")
 
 if uploaded_file is not None:
     try:
@@ -295,6 +354,7 @@ if uploaded_file is not None:
                             update_year=update_year,
                             wing_name=wing_name,
                             inventory_number=inventory_number,
+                            logo_image=logo_image,
                         )
                         zip_file.writestr(f"بطاقة_{safe_filename(room)}.pdf", pdf_bytes)
                         generated += 1
