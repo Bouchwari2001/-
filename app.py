@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 from bidi.algorithm import get_display
 from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib import font_manager
 from PIL import Image
 
 
@@ -40,6 +41,14 @@ PAGE_SIZE = (8.27, 11.69)
 ROWS_PER_PAGE = 15
 TABLE_COLUMNS = ["ملاحظات", "رقم الجرد", "العدد", "بيان التجهيز / الأثاث", "رت"]
 TABLE_WIDTHS = [0.18, 0.16, 0.1, 0.46, 0.1]
+TAJAWAL_FONT_PATH = r"c:\Users\hp\Downloads\Tajawal-Medium.ttf"
+
+if TAJAWAL_FONT_PATH:
+    try:
+        font_manager.fontManager.addfont(TAJAWAL_FONT_PATH)
+        plt.rcParams["font.family"] = "Tajawal"
+    except Exception:
+        pass
 
 
 def rtl_text(value):
@@ -216,7 +225,7 @@ def draw_page(ax, room, school_name, update_year, rows, logo_image):
         bbox=[0.035, 0.195, 0.91, 0.51],
     )
     table.auto_set_font_size(False)
-    table.set_fontsize(10.5)
+    table.set_fontsize(9.8)
 
     for (row, col), cell in table.get_celld().items():
         cell.set_linewidth(1.2)
@@ -232,18 +241,18 @@ def draw_page(ax, room, school_name, update_year, rows, logo_image):
             cell.get_text().set_ha("center")
 
     ax.text(0.5, 0.845, "FICHE RECAPITULATIVE DE L'INVENTAIRE", ha="center", va="center", fontsize=12.5, fontweight="bold")
-    ax.text(0.5, 0.812, rtl_text("بطاقة توطين المجرود"), ha="center", va="center", fontsize=17, fontweight="bold")
+    ax.text(0.5, 0.812, rtl_text("بطاقة توطين المجرود"), ha="center", va="center", fontsize=15.5, fontweight="bold")
 
     draw_box(ax, 0.035, 0.738, 0.34, 0.035)
     ax.text(0.43, 0.755, rtl_text("المكان :"), ha="left", va="center", fontsize=11.5, fontweight="bold")
-    ax.text(0.36, 0.755, rtl_text(room), ha="right", va="center", fontsize=9.8)
+    ax.text(0.355, 0.755, rtl_text(room), ha="right", va="center", fontsize=9.2)
 
     draw_box(ax, 0.035, 0.700, 0.34, 0.035)
     ax.text(0.43, 0.717, rtl_text("تاريخ التحيين :"), ha="left", va="center", fontsize=11.5, fontweight="bold")
-    ax.text(0.36, 0.717, rtl_text(update_year), ha="right", va="center", fontsize=9.8)
+    ax.text(0.355, 0.717, rtl_text(update_year), ha="right", va="center", fontsize=9.2)
 
-    ax.text(0.2, 0.185, rtl_text("توقيع رئيس المؤسسة"), ha="center", va="center", fontsize=11.5, fontweight="bold")
-    ax.text(0.73, 0.185, rtl_text("توقيع مسير المصالح المادية و المالية"), ha="center", va="center", fontsize=11.5, fontweight="bold")
+    ax.text(0.18, 0.165, rtl_text("توقيع رئيس المؤسسة"), ha="center", va="center", fontsize=9.8, fontweight="normal")
+    ax.text(0.72, 0.165, rtl_text("توقيع مسير المصالح المادية والمالية"), ha="center", va="center", fontsize=9.8, fontweight="normal")
 
 
 def build_room_pdf(room, card_df, school_name, update_year, logo_image):
