@@ -42,12 +42,12 @@ ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 PAGE_SIZE = (8.27, 11.69)
 ROWS_PER_PAGE = 15
 ROOM_KEYWORDS = ["Salle", "قاعة", "مختبر", "Laboratoire"]
-TABLE_COLUMNS = ["ملاحظات", "رقم الجرد", "العدد", "بيان التجهيز / الأثاث", "رت"]
-TABLE_WIDTHS = [0.18, 0.16, 0.10, 0.46, 0.10]
+TABLE_COLUMNS = ["ملاحظات", "الحالة", "رقم الجرد", "العدد", "بيان التجهيز / الأثاث", "رت"]
+TABLE_WIDTHS = [0.20, 0.13, 0.13, 0.08, 0.36, 0.10]
 
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
-FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.jpg"
+FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.png"
 
 BODY_FONT_CANDIDATES = [
     ASSETS_DIR / "body-arabic.ttf",
@@ -152,6 +152,11 @@ def prepare_card_dataframe(df, room, equipment_col):
     room_counts = pd.to_numeric(df[room], errors="coerce").fillna(0)
     valid_items = df[room_counts > 0]
 
+    # Detect optional enrichment columns in the uploaded file
+    has_inv_num   = "رقم الجرد" in df.columns
+    has_condition = "الحالة"    in df.columns
+    has_remarks   = "ملاحظات"   in df.columns
+
     rows = []
     for idx, (_, row) in enumerate(valid_items.iterrows(), start=1):
         equipment_name = str(row.get(equipment_col, "")).strip()
@@ -161,11 +166,12 @@ def prepare_card_dataframe(df, room, equipment_col):
         count_value = pd.to_numeric(pd.Series([row[room]]), errors="coerce").fillna(0).iloc[0]
         rows.append(
             {
-                "ملاحظات": "",
-                "رقم الجرد": "",
-                "العدد": int(count_value),
+                "ملاحظات":              str(row["ملاحظات"]).strip()   if has_remarks   and str(row["ملاحظات"])   not in {"nan", "None"} else "",
+                "الحالة":               str(row["الحالة"]).strip()    if has_condition and str(row["الحالة"])    not in {"nan", "None"} else "",
+                "رقم الجرد":            str(row["رقم الجرد"]).strip() if has_inv_num   and str(row["رقم الجرد"]) not in {"nan", "None"} else "",
+                "العدد":                int(count_value),
                 "بيان التجهيز / الأثاث": equipment_name,
-                "رت": idx,
+                "رت":                   idx,
             }
         )
 
@@ -176,17 +182,23 @@ def build_excel_template():
     buffer = io.BytesIO()
 
     sample_rows = [
-        {"بيان التجهيز / الأثاث": "طاولة", "Salle 01": 10, "Salle 02": 0, "مختبر": 0, "SVT": 0, "PC": 0},
-        {"بيان التجهيز / الأثاث": "كرسي", "Salle 01": 20, "Salle 02": 18, "مختبر": 0, "SVT": 0, "PC": 0},
-        {"بيان التجهيز / الأثاث": "سبورة", "Salle 01": 1, "Salle 02": 1, "مختبر": 0, "SVT": 0, "PC": 0},
-        {"بيان التجهيز / الأثاث": "حاسوب", "Salle 01": 0, "Salle 02": 0, "مختبر": 0, "SVT": 0, "PC": 12},
+        {"رقم الجرد": "INV-001", "بيان التجهيز / الأثاث": "طاولة",  "الحالة": "جديد",       "ملاحظات": "",              "Salle 01": 10, "Salle 02": 0,  "مختبر": 0, "SVT": 0, "PC": 0},
+        {"رقم الجرد": "INV-002", "بيان التجهيز / الأثاث": "كرسي",   "الحالة": "مستعمل",     "ملاحظات": "بعضها تالف",    "Salle 01": 20, "Salle 02": 18, "مختبر": 0, "SVT": 0, "PC": 0},
+        {"رقم الجرد": "INV-003", "بيان التجهيز / الأثاث": "سبورة",  "الحالة": "جيد",         "ملاحظات": "",              "Salle 01": 1,  "Salle 02": 1,  "مختبر": 0, "SVT": 0, "PC": 0},
+        {"رقم الجرد": "INV-004", "بيان التجهيز / الأثاث": "حاسوب",  "الحالة": "معطل",        "ملاحظات": "بحاجة إصلاح",  "Salle 01": 0,  "Salle 02": 0,  "مختبر": 0, "SVT": 0, "PC": 12},
     ]
-    template_df = pd.DataFrame(sample_rows)
+    template_df = pd.DataFrame(
+        sample_rows,
+        columns=["رقم الجرد", "بيان التجهيز / الأثاث", "الحالة", "ملاحظات", "Salle 01", "Salle 02", "مختبر", "SVT", "PC"],
+    )
 
     instructions_df = pd.DataFrame(
         {
             "تعليمات": [
                 "املأ اسم التجهيز في عمود: بيان التجهيز / الأثاث",
+                "أدخل رقم الجرد الخاص بكل تجهيز في عمود: رقم الجرد  (اختياري)",
+                "حدد حالة التجهيز في عمود: الحالة  — مثلاً: جديد / مستعمل / معطل  (اختياري)",
+                "أضف أي ملاحظات إضافية في عمود: ملاحظات  (اختياري)",
                 "ضع عدد كل تجهيز داخل العمود الخاص بالقاعة أو المختبر",
                 "يمكنك إضافة أعمدة جديدة مثل Salle 03 أو قاعة 1 أو مختبر",
                 "بعد التعبئة احفظ الملف ثم ارفعه داخل التطبيق لتوليد ملفات PDF",
@@ -229,6 +241,7 @@ def get_page_rows(card_df, page_index):
             rows.append(
                 [
                     rtl_text(row["ملاحظات"]),
+                    rtl_text(row["الحالة"]),
                     rtl_text(row["رقم الجرد"]),
                     str(row["العدد"]),
                     rtl_text(row["بيان التجهيز / الأثاث"]),
@@ -236,7 +249,7 @@ def get_page_rows(card_df, page_index):
                 ]
             )
         else:
-            rows.append(["", "", "", "", str(rank)])
+            rows.append(["", "", "", "", "", str(rank)])
     return rows
 
 
@@ -326,9 +339,9 @@ def draw_table(ax, rows):
         if BODY_FONT_PROP is not None:
             cell.get_text().set_fontproperties(BODY_FONT_PROP)
 
-        if col == 3:
+        if col == 4:
             cell.get_text().set_ha("right")
-        elif row > 0 and col in [0, 1, 2, 4]:
+        elif row > 0 and col in [0, 1, 2, 3, 5]:
             cell.get_text().set_ha("center")
 
 
