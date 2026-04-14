@@ -53,7 +53,7 @@ _DISPLAY_WIDTHS_SLIM = [0.20, 0.16, 0.10, 0.44, 0.10]
 
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
-FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.png"
+FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.jpg"
 
 BODY_FONT_CANDIDATES = [
     ASSETS_DIR / "body-arabic.ttf",
