@@ -42,12 +42,18 @@ ARABIC_RE = re.compile(r"[\u0600-\u06FF]")
 PAGE_SIZE = (8.27, 11.69)
 ROWS_PER_PAGE = 15
 ROOM_KEYWORDS = ["Salle", "قاعة", "مختبر", "Laboratoire"]
+# Internal DataFrame column order (always includes الحالة for consistent structure)
 TABLE_COLUMNS = ["ملاحظات", "الحالة", "رقم الجرد", "العدد", "بيان التجهيز / الأثاث", "رت"]
-TABLE_WIDTHS = [0.20, 0.13, 0.13, 0.08, 0.36, 0.10]
+
+# PDF display variants — الحالة is shown only when the user actually filled it in
+_DISPLAY_COLS_FULL   = ["ملاحظات", "الحالة", "رقم الجرد", "العدد", "بيان التجهيز / الأثاث", "رت"]
+_DISPLAY_WIDTHS_FULL = [0.20, 0.13, 0.13, 0.08, 0.36, 0.10]
+_DISPLAY_COLS_SLIM   = ["ملاحظات", "رقم الجرد", "العدد", "بيان التجهيز / الأثاث", "رت"]
+_DISPLAY_WIDTHS_SLIM = [0.20, 0.16, 0.10, 0.44, 0.10]
 
 BASE_DIR = Path(__file__).resolve().parent
 ASSETS_DIR = BASE_DIR / "assets"
-FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.jpg"
+FIXED_HEADER_IMAGE_PATH = ASSETS_DIR / "fixed_header.png"
 
 BODY_FONT_CANDIDATES = [
     ASSETS_DIR / "body-arabic.ttf",
@@ -228,7 +234,7 @@ def draw_header_band(ax):
     ax.plot([0.72, 0.74], [0.946, 0.94], color=color, lw=2.2)
 
 
-def get_page_rows(card_df, page_index):
+def get_page_rows(card_df, page_index, use_condition: bool):
     start = page_index * ROWS_PER_PAGE
     end = start + ROWS_PER_PAGE
     page_df = card_df.iloc[start:end].copy()
@@ -238,18 +244,16 @@ def get_page_rows(card_df, page_index):
         rank = start + offset + 1
         if offset < len(page_df):
             row = page_df.iloc[offset]
-            rows.append(
-                [
-                    rtl_text(row["ملاحظات"]),
-                    rtl_text(row["الحالة"]),
-                    rtl_text(row["رقم الجرد"]),
-                    str(row["العدد"]),
-                    rtl_text(row["بيان التجهيز / الأثاث"]),
-                    str(rank),
-                ]
-            )
+            r = [rtl_text(row["ملاحظات"])]
+            if use_condition:
+                r.append(rtl_text(row["الحالة"]))
+            r += [rtl_text(row["رقم الجرد"]), str(row["العدد"]),
+                  rtl_text(row["بيان التجهيز / الأثاث"]), str(rank)]
+            rows.append(r)
         else:
-            rows.append(["", "", "", "", "", str(rank)])
+            n_cols = 6 if use_condition else 5
+            empty = [""] * (n_cols - 1) + [str(rank)]
+            rows.append(empty)
     return rows
 
 
@@ -315,12 +319,17 @@ def draw_header(ax, header_mode, header_image, academy_name, directorate_name, s
     )
 
 
-def draw_table(ax, rows):
-    col_labels = [rtl_text(col) for col in TABLE_COLUMNS]
+def draw_table(ax, rows, use_condition: bool):
+    display_cols   = _DISPLAY_COLS_FULL   if use_condition else _DISPLAY_COLS_SLIM
+    display_widths = _DISPLAY_WIDTHS_FULL if use_condition else _DISPLAY_WIDTHS_SLIM
+    equip_idx      = 4 if use_condition else 3   # index of بيان التجهيز column
+    center_idx     = [0, 1, 2, 3, 5] if use_condition else [0, 1, 2, 4]
+
+    col_labels = [rtl_text(col) for col in display_cols]
     table = ax.table(
         cellText=rows,
         colLabels=col_labels,
-        colWidths=TABLE_WIDTHS,
+        colWidths=display_widths,
         cellLoc="center",
         bbox=[0.035, 0.16, 0.91, 0.36],
     )
@@ -339,19 +348,19 @@ def draw_table(ax, rows):
         if BODY_FONT_PROP is not None:
             cell.get_text().set_fontproperties(BODY_FONT_PROP)
 
-        if col == 4:
+        if col == equip_idx:
             cell.get_text().set_ha("right")
-        elif row > 0 and col in [0, 1, 2, 3, 5]:
+        elif row > 0 and col in center_idx:
             cell.get_text().set_ha("center")
 
 
-def draw_page(ax, room, update_year, rows, header_mode, header_image, school_name, directorate_name, academy_name):
+def draw_page(ax, room, update_year, rows, use_condition, header_mode, header_image, school_name, directorate_name, academy_name):
     ax.axis("off")
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
 
     draw_header(ax, header_mode, header_image, academy_name, directorate_name, school_name)
-    draw_table(ax, rows)
+    draw_table(ax, rows, use_condition)
 
     ax.text(0.5, 0.735, "FICHE RECAPITULATIVE DE L'INVENTAIRE", ha="center", va="center", fontsize=12.5, fontweight="bold")
     ax.text(0.5, 0.695, rtl_text("بطاقة توطين المجرود"), ha="center", va="center", **text_kwargs(BODY_FONT_PROP, size=16, weight="bold"))
@@ -372,6 +381,9 @@ def build_room_pdf(room, card_df, update_year, header_mode, header_image, school
     pdf_buffer = io.BytesIO()
     total_pages = max(1, math.ceil(len(card_df) / ROWS_PER_PAGE))
 
+    # Show الحالة column in PDF only if at least one row has a non-empty value
+    use_condition = card_df["الحالة"].astype(str).str.strip().ne("").any()
+
     with PdfPages(pdf_buffer) as pdf:
         for page_index in range(total_pages):
             fig, ax = plt.subplots(figsize=PAGE_SIZE)
@@ -381,7 +393,8 @@ def build_room_pdf(room, card_df, update_year, header_mode, header_image, school
                 ax=ax,
                 room=room,
                 update_year=update_year,
-                rows=get_page_rows(card_df, page_index),
+                rows=get_page_rows(card_df, page_index, use_condition),
+                use_condition=use_condition,
                 header_mode=header_mode,
                 header_image=header_image,
                 school_name=school_name,
